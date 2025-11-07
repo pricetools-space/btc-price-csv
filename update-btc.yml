@@ -3,30 +3,42 @@ on:
   schedule:
     - cron: '0 1 * * *'
   workflow_dispatch:
-
 jobs:
   update:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Get yesterday's BTC price
+        id: price
         run: |
-          DATE=$(TZ=America/New_York date -d "yesterday" +%m/%d/%Y)
-          TS=$(TZ=America/New_York date -d "yesterday 13:00" +%s)000
-          END=$((TS + 86400000))
-          PRICE=$(curl -s "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=$TS&endTime=$END&limit=1" | grep -o '"4":"[^"]*' | cut -d'"' -f4)
-          echo "DATE=$DATE" >> $GITHUB_ENV
-          echo "PRICE=$PRICE" >> $GITHUB_ENV
-
+          python3 -c "
+import json
+from datetime import datetime, timezone
+import pytz
+tz = pytz.timezone('America/New_York')
+yesterday = datetime.now(tz).date() - timedelta(days=1)
+ts = int(tz.localize(datetime.combine(yesterday, datetime.min.time())).timestamp() * 1000)
+end = ts + 86400000
+data = json.loads(subprocess.check_output(['curl', '-s', f'https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime={ts}&endTime={end}&limit=1']))
+if data and len(data) > 0:
+  price = data[0][4]
+  date = yesterday.strftime('%m/%d/%Y')
+  print(f'date={date}')
+  print(f'price={price}')
+else:
+  print('skip=true')
+"
+        env:
+          GITHUB_OUTPUT: ${{ runner.temp }}/output
       - name: Append to CSV
+        if: steps.price.outputs.skip != 'true'
         run: |
-          echo "$DATE,$PRICE" >> bitcoin-data.csv
-
+          echo "${{ steps.price.outputs.date }},${{ steps.price.outputs.price }}" >> bitcoin-data.csv
       - name: Commit and push
+        if: steps.price.outputs.skip != 'true'
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add bitcoin-data.csv
-          git commit -m "Update BTC price: $DATE"
+          git commit -m "Update BTC price: ${{ steps.price.outputs.date }}"
           git push
