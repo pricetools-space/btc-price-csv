@@ -14,13 +14,17 @@ https.get('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT', (res) =>
   res.on('end', () => {
     try {
       const json = JSON.parse(body);
+      if (!json.price) throw new Error('No price in JSON');
       const price = Math.floor(parseFloat(json.price));
+      if (isNaN(price)) throw new Error('Invalid price');
       const line = `${formatted},${price}\n`;
       fs.appendFileSync('bitcoin-data.csv', line);
       console.log('Updated:', line.trim());
     } catch (e) {
-      console.log('Raw body:', body);
-      console.error('Error:', e.message);
+      console.log('Raw response:', body);
+      console.error('Failed:', e.message);
     }
   });
-}).on('error', (e) => console.error('Network error:', e.message));
+}).on('error', (e) => {
+  console.error('Network error:', e.message);
+});
