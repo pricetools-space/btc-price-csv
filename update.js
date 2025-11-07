@@ -8,15 +8,13 @@ const d = date.getDate();
 const y = date.getFullYear() % 100;
 const formatted = `${m}/${d}/${y}`;
 
-https.get('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT', (res) => {
+https.get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd', (res) => {
   let body = '';
   res.on('data', chunk => body += chunk.toString());
   res.on('end', () => {
     try {
       const json = JSON.parse(body);
-      if (!json.price) throw new Error('No price in JSON');
-      const price = Math.floor(parseFloat(json.price));
-      if (isNaN(price)) throw new Error('Invalid price');
+      const price = Math.floor(json.bitcoin.usd);
       const line = `${formatted},${price}\n`;
       fs.appendFileSync('bitcoin-data.csv', line);
       console.log('Updated:', line.trim());
