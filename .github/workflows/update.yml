@@ -17,9 +17,14 @@ jobs:
           YESTERDAY=$(TZ='America/New_York' date -d "yesterday 13:00" +%s)000
           END=$((YESTERDAY + 86400000))
           RESPONSE=$(curl -s "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=$YESTERDAY&endTime=$END&limit=1")
-          PRICE=$(echo "$RESPONSE" | jq -r '.[0][4] // empty')
-          if [ -z "$PRICE" ] || [ "$PRICE" = "null" ]; then
-            echo "API returned no data, skipping update"
+          if ! echo "$RESPONSE" | jq -e . >/dev/null 2>&1; then
+            echo "Invalid JSON, skipping"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          PRICE=$(echo "$RESPONSE" | jq -r '.[0][4] // null')
+          if [ "$PRICE" = "null" ] || [ -z "$PRICE" ]; then
+            echo "No price data, skipping"
             echo "skip=true" >> $GITHUB_OUTPUT
           else
             DATE=$(TZ='America/New_York' date -d "yesterday" +%m/%d/%Y)
