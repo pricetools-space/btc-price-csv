@@ -9,15 +9,13 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
       - name: Fetch yesterday's close price
         id: price
         run: |
-          YESTERDAY=$(date -d "yesterday" +%s)000
+          YESTERDAY=$(TZ='America/New_York' date -d "yesterday" +%s)000
           END=$((YESTERDAY + 86400000))
           PRICE=$(curl -s "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=$YESTERDAY&endTime=$END&limit=1" | jq -r '.[0][4]')
-          DATE=$(date -d "yesterday" +%m/%d/%Y)
+          DATE=$(TZ='America/New_York' date -d "yesterday" +%m/%d/%Y)
           echo "date=$DATE" >> $GITHUB_OUTPUT
           echo "price=$PRICE" >> $GITHUB_OUTPUT
       - name: Append to CSV
