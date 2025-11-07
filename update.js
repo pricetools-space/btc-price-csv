@@ -8,6 +8,21 @@ const d = date.getDate();
 const y = date.getFullYear() % 100;
 const formatted = `${m}/${d}/${y}`;
 
+// Read current CSV
+let csv = '';
+try {
+  csv = fs.readFileSync('bitcoin-data.csv', 'utf8').trim();
+} catch (e) {
+  csv = '';
+}
+
+// Skip if already exists
+if (csv.includes(`${formatted},`)) {
+  console.log(`Skipped: ${formatted} already exists`);
+  process.exit(0);
+}
+
+// Fetch price
 https.get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd', (res) => {
   let body = '';
   res.on('data', chunk => body += chunk.toString());
@@ -15,14 +30,12 @@ https.get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currenci
     try {
       const json = JSON.parse(body);
       const price = Math.floor(json.bitcoin.usd);
-      const line = `${formatted},${price}\n`;
-      fs.appendFileSync('bitcoin-data.csv', line);
-      console.log('Updated:', line.trim());
+      const line = `${formatted},${price}`;
+      const newCsv = line + (csv ? '\n' + csv : '');
+      fs.writeFileSync('bitcoin-data.csv', newCsv + '\n');
+      console.log('Updated (top):', line);
     } catch (e) {
-      console.log('Raw response:', body);
       console.error('Failed:', e.message);
     }
   });
-}).on('error', (e) => {
-  console.error('Network error:', e.message);
-});
+}).on('error', (e) => console.error('Network error:', e.message));
