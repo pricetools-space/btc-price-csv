@@ -1,0 +1,13 @@
+name: Set Script Executable
+on: workflow_dispatch
+jobs:
+  set:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: git update-index --chmod=+x update-script.sh
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: Make update-script.sh executable
