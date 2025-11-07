@@ -14,16 +14,25 @@ jobs:
       - name: Fetch yesterday's close price
         id: price
         run: |
-          YESTERDAY=$(TZ='America/New_York' date -d "yesterday" +%s)000
+          YESTERDAY=$(TZ='America/New_York' date -d "yesterday 13:00" +%s)000
           END=$((YESTERDAY + 86400000))
-          PRICE=$(curl -s "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=$YESTERDAY&endTime=$END&limit=1" | jq -r '.[0][4]')
-          DATE=$(TZ='America/New_York' date -d "yesterday" +%m/%d/%Y)
-          echo "date=$DATE" >> $GITHUB_OUTPUT
-          echo "price=$PRICE" >> $GITHUB_OUTPUT
+          RESPONSE=$(curl -s "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=$YESTERDAY&endTime=$END&limit=1")
+          PRICE=$(echo "$RESPONSE" | jq -r '.[0][4] // empty')
+          if [ -z "$PRICE" ] || [ "$PRICE" = "null" ]; then
+            echo "API returned no data, skipping update"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            DATE=$(TZ='America/New_York' date -d "yesterday" +%m/%d/%Y)
+            echo "date=$DATE" >> $GITHUB_OUTPUT
+            echo "price=$PRICE" >> $GITHUB_OUTPUT
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
       - name: Append to CSV
+        if: steps.price.outputs.skip == 'false'
         run: |
           echo "${{ steps.price.outputs.date }},${{ steps.price.outputs.price }}" >> bitcoin-data.csv
       - name: Commit & push
+        if: steps.price.outputs.skip == 'false'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
