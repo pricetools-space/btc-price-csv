@@ -1,0 +1,32 @@
+name: Update BTC Price
+on:
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get yesterday's BTC price
+        run: |
+          DATE=$(TZ=America/New_York date -d "yesterday" +%m/%d/%Y)
+          TS=$(TZ=America/New_York date -d "yesterday 13:00" +%s)000
+          END=$((TS + 86400000))
+          PRICE=$(curl -s "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=$TS&endTime=$END&limit=1" | grep -o '"4":"[^"]*' | cut -d'"' -f4)
+          echo "DATE=$DATE" >> $GITHUB_ENV
+          echo "PRICE=$PRICE" >> $GITHUB_ENV
+
+      - name: Append to CSV
+        run: |
+          echo "$DATE,$PRICE" >> bitcoin-data.csv
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add bitcoin-data.csv
+          git commit -m "Update BTC price: $DATE"
+          git push
