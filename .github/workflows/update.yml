@@ -7,40 +7,28 @@ jobs:
   update-csv:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
-      - name: Fetch yesterday's close price
-        id: price
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y jq curl
+      - id: price
         run: |
-          YESTERDAY=$(TZ='America/New_York' date -d "yesterday 13:00" +%s)000
-          END=$((YESTERDAY + 86400000))
-          RESPONSE=$(curl -s "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=$YESTERDAY&endTime=$END&limit=1")
-          if ! echo "$RESPONSE" | jq -e . >/dev/null 2>&1; then
-            echo "Invalid JSON, skipping"
-            echo "skip=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          PRICE=$(echo "$RESPONSE" | jq -r '.[0][4] // null')
-          if [ "$PRICE" = "null" ] || [ -z "$PRICE" ]; then
-            echo "No price data, skipping"
-            echo "skip=true" >> $GITHUB_OUTPUT
+          DATE=$(TZ=America/New_York date -d yesterday +%m/%d/%Y)
+          TS=$(TZ=America/New_York date -d yesterday +%s)000
+          END=$((TS + 86400000))
+          DATA=$(curl -s "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&startTime=$TS&endTime=$END&limit=1")
+          PRICE=$(echo "$DATA" | jq -r '.[0][4] // "null"')
+          if [ "$PRICE" = "null" ]; then
+            echo "skip=true"
           else
-            DATE=$(TZ='America/New_York' date -d "yesterday" +%m/%d/%Y)
             echo "date=$DATE" >> $GITHUB_OUTPUT
             echo "price=$PRICE" >> $GITHUB_OUTPUT
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
-      - name: Append to CSV
-        if: steps.price.outputs.skip == 'false'
-        run: |
-          echo "${{ steps.price.outputs.date }},${{ steps.price.outputs.price }}" >> bitcoin-data.csv
-      - name: Commit & push
-        if: steps.price.outputs.skip == 'false'
+      - if: steps.price.outputs.skip == 'false'
+        run: echo "${{ steps.price.outputs.date }},${{ steps.price.outputs.price }}" >> bitcoin-data.csv
+      - if: steps.price.outputs.skip == 'false'
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add bitcoin-data.csv
-          git commit -m "Daily BTC price update ($(date -u +%F))"
+          git commit -m "Update BTC price: $DATE"
           git push
