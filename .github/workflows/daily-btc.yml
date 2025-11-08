@@ -11,19 +11,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
-          DATE=$(date +%m/%-d/%y)                     # today in EST
-          PRICE=$(curl -s "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd" | jq -r '.bitcoin.usd | floor')
-          LINE="$DATE,$PRICE"
-
-          if grep -q "^$LINE$" bitcoin-data.csv; then
-            echo "Already exists: $LINE"
-            exit 0
+          # Get today's date in EST
+          TODAY=$(date +%m/%-d/%y)
+          START_DATE=$(head -n1 bitcoin-data.csv | cut -d',' -f1)  # latest date in -f1
+          if [ -z "$START_DATE" ]; then
+            START_DATE="01/1/20"  # fallback
           fi
 
-          sed -i "1i $LINE" bitcoin-data.csv
+          # Convert dates to epoch for loop
+          TODAY_EPOCH=$(date -d "$TODAY" +%s)
+          START_EPOCH=$(date -d "$START_DATE" +%s)
+
+          # Loop from day after latest to today
+          CURRENT=$(( START_EPOCH + 86400 ))
+          while [ $CURRENT -le $TODAY_EPOCH ]; do
+            DATE=$(date -d "@$CURRENT" +%m/%-d/%y)
+            PRICE=$(curl -s "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&date=$(date -d "@$CURRENT" +%d-%m-%Y)" | jq -r '.bitcoin.usd | floor // empty')
+            if [ -z "$PRICE" ]; then
+              PRICE=$(curl -s "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd" | jq -r '.bitcoin.usd | floor')
+            fi
+            LINE="$DATE,$PRICE"
+            if ! grep -q "^$LINE$" bitcoin-data.csv; then
+              sed -i "1i $LINE" bitcoin-data.csv
+              echo "Added: $LINE"
+            fi
+            CURRENT=$(( CURRENT + 86400 ))
+          done
       - run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add bitcoin-data.csv
-          git commit -m "BTC close: $DATE" || exit 0
+          git commit -m "BTC backfill to $TODAY" || exit 0
           git push
