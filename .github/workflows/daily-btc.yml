@@ -1,0 +1,27 @@
+name: Daily BTC Update
+on:
+  schedule:
+    - cron: '30 2 * * *'   # 10:30 PM EST = 2:30 AM UTC
+  workflow_dispatch:
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          DATE=$(date +%m/%-d/%y)
+          PRICE=$(curl -s "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd" | jq -r '.bitcoin.usd | floor')
+          LINE="$DATE,$PRICE"
+          if grep -q "^$LINE$" bitcoin-data.csv; then
+            echo "Already exists: $LINE"
+            exit 0
+          fi
+          sed -i "1i $LINE" bitcoin-data.csv
+      - run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add bitcoin-data.csv
+          git commit -m "BTC close: $DATE" || exit 0
+          git push
