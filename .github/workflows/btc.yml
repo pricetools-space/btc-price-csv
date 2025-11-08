@@ -1,7 +1,7 @@
 name: Update BTC CSV Daily
 on:
   schedule:
-    - cron: '6 2 * * *'   # 2:06 AM UTC = 10:06 PM EST
+- cron: '8 2 * * *'   # 2:08 AM UTC = 10:08 PM EST
   workflow_dispatch:
 jobs:
   update:
