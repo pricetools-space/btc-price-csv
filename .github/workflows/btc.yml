@@ -1,7 +1,7 @@
 name: Update BTC CSV Daily
 on:
   schedule:
-    - cron: '0 1 * * *'
+    - cron: '0 1 * * *'   # 1 AM UTC = 9 PM EST
   workflow_dispatch:
 jobs:
   update:
@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
-          DATE=$(date -d "yesterday" +%m/%-d/%y)
+          DATE=$(date +%m/%-d/%y)  # TODAY in EST
           PRICE=$(curl -s "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd" | jq -r '.bitcoin.usd | floor')
           LINE="$DATE,$PRICE"
 
@@ -25,5 +25,5 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add bitcoin-data.csv
-          git commit -m "BTC update: $DATE" || exit 0
+          git commit -m "BTC close: $DATE" || exit 0
           git push
