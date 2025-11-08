@@ -9,13 +9,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
-          DATE=$(TZ=America/New_York date -d "yesterday" +%m/%-d/%y)
+          # Force EST time
+          export TZ=America/New_York
+          DATE=$(date -d "yesterday" +%m/%-d/%y)
           PRICE=$(curl -s "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd" | jq -r '.bitcoin.usd | floor')
           LINE="$DATE,$PRICE"
+
           if grep -q "^$LINE$" bitcoin-data.csv; then
             echo "Already exists: $LINE"
             exit 0
           fi
+
           sed -i "1i $LINE" bitcoin-data.csv
       - run: |
           git config user.name "github-actions"
