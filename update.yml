@@ -1,4 +1,4 @@
-name: Update BTC CSV
+name: Update BTC CSV Daily
 on:
   schedule:
     - cron: '0 1 * * *'
